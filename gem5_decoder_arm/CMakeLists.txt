@@ -55,8 +55,8 @@ add_library(nomali ${SRC_NOMALI})
 
 set(SRC_DECODER)
 file(GLOB_RECURSE SRC_DECODER ./arch/*.cc ./base/*.cc ./config/*.cc ./cpu/*.cc ./dev/*.cc ./kern/*.cc ./mem/*.cc ./params/*.cc ./sim/*.cc ./enums/*.cc ./python/*.cc)
-add_library(decoder ${SRC_DECODER})
+add_library(gem5_decoder ${SRC_DECODER})
 
-add_executable( main main.cc )
+# add_executable( main main.cc )
 
-target_link_libraries(main PUBLIC decoder ${HDF5_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARY} pthread libfdt iostream3 nomali elf pybind11::module pybind11::embed rt ) # work for zlib
+# target_link_libraries(main PUBLIC decoder ${HDF5_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARY} pthread libfdt iostream3 nomali elf pybind11::module pybind11::embed rt ) # work for zlib
