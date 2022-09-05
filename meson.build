@@ -2518,6 +2518,28 @@ common_all = static_library('common',
                             name_suffix: 'fa')
 
 feature_to_c = find_program('scripts/feature_to_c.sh')
+cpp = meson.get_compiler('cpp')
+
+cmake = import('cmake')
+sub_opt = cmake.subproject_options()
+sub_opt.set_override_option('cpp_std', 'c++17')
+sub_opt.set_override_option('werror', 'false')
+sub_proj = cmake.subproject('gem5_decoder_arm', options: sub_opt)
+gem5_decoder_lib = sub_proj.dependency('gem5_decoder')
+# hdf5_lib = sub_proj.dependency('HDF5_LIBRARIES')
+hdf5_lib = dependency('hdf5', language: 'cpp', required: true)
+zlib_lib = dependency('ZLIB', required: true)
+python_lib = dependency('python3', required: true)
+png_lib = dependency('PNG', required: true)
+#pthread_lib = dependency('Pthread', required: true)
+pthread_lib = cpp.find_library('pthread', required: true)
+libfdt = sub_proj.dependency('libfdt')
+iostream3 = sub_proj.dependency('iostream3')
+nomali = sub_proj.dependency('nomali')
+elf_lib = cpp.find_library('elf', required: true)
+rt_lib = cpp.find_library('rt', required: true)
+
+gem5_added_libs = [gem5_decoder_lib, hdf5_lib, zlib_lib, python_lib, png_lib, pthread_lib, libfdt, iostream3, nomali, elf_lib, rt_lib]
 
 emulators = {}
 foreach target : target_dirs
@@ -2652,7 +2674,7 @@ foreach target : target_dirs
     emulator = executable(exe_name, exe['sources'],
                install: true,
                c_args: c_args,
-               dependencies: arch_deps + deps + exe['dependencies'],
+               dependencies: arch_deps + deps + exe['dependencies'] + gem5_added_libs,
                objects: lib.extract_all_objects(recursive: true),
                link_language: link_language,
                link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),

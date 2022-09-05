@@ -24,6 +24,7 @@
 #include "qemu/guest-random.h"
 #include "semihosting/common-semi.h"
 #include "target/arm/syndrome.h"
+#include "subprojects/gem5_decoder_arm/decoder_warpper.hh"
 
 #define get_user_code_u32(x, gaddr, env)                \
     ({ abi_long __r = get_user_u32((x), (gaddr));       \
@@ -80,6 +81,9 @@ void cpu_loop(CPUARMState *env)
     int trapnr, ec, fsc;
     abi_long ret;
     target_siginfo_t info;
+    decode(0xd50342df);
+    decode(0xd50342df);
+    decode(0xd50342df);
 
     for (;;) {
         cpu_exec_start(cs);
