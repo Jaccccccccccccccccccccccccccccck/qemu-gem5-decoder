@@ -9791,6 +9791,12 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     }
 }
 
+void helper_start_callback(void *s, CPUARMState *env)
+{
+    TranslationBlock *tb = s;
+    printf("start callback, translating pc: %lx\n", tb->pc);
+}
+
 static void arm_tr_disas_log(const DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);

@@ -14834,6 +14834,9 @@ static void aarch64_tr_init_disas_context(DisasContextBase *dcbase,
 
 static void aarch64_tr_tb_start(DisasContextBase *db, CPUState *cpu)
 {
+    TCGv_ptr dcs = tcg_const_ptr(db->tb);
+    gen_helper_start_callback(dcs, cpu_env);
+    tcg_temp_free_ptr(dcs);
 }
 
 static void aarch64_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
