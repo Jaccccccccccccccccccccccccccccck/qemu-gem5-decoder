@@ -1013,7 +1013,10 @@ DEF_HELPER_FLAGS_6(gvec_bfmlal, TCG_CALL_NO_RWG,
 DEF_HELPER_FLAGS_6(gvec_bfmlal_idx, TCG_CALL_NO_RWG,
                    void, ptr, ptr, ptr, ptr, ptr, i32)
                    
-DEF_HELPER_2(start_callback,void,ptr, env)
+DEF_HELPER_2(bb_start_callback,void,ptr, env)
+DEF_HELPER_2(start_trace_callback,void,ptr, env)
+DEF_HELPER_2(start_trace_by_pid_callback,void,ptr, env)
+DEF_HELPER_2(end_trace_callback,void,ptr, env)
 
 #ifdef TARGET_AARCH64
 #include "helper-a64.h"

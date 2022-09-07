@@ -9791,11 +9791,37 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     }
 }
 
-void helper_start_callback(void *s, CPUARMState *env)
-{
-    TranslationBlock *tb = s;
-    printf("start callback, translating pc: %lx\n", tb->pc);
-}
+#include "trace_filter/trace_filter.h"
+extern struct TraceFilter trace_filter;
+
+void helper_bb_start_callback(void* s, CPUARMState* env) {
+    // TranslationBlock *tb = s;
+    if (trace_filter.is_filter_on) {
+        if (trace_filter.is_filter_by_pid) {
+            // filter by pid
+        } else {
+            // printf("start callback, translating pc: %lx\n", tb->pc);
+        }
+    }
+};
+
+void helper_start_trace_callback(void* s, CPUARMState* env) {
+    trace_filter.is_filter_on = 1;
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_on, trace_filter.pid);
+};
+
+void helper_start_trace_by_pid_callback(void* s, CPUARMState* env) {
+    trace_filter.pid = env->xregs[9];
+    printf("[Trace Filter Get PID] ppid: %d, pid: %d, tid: %d\n", (int)env->xregs[8], (int)env->xregs[9], (int)env->xregs[10]);
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_on, trace_filter.pid);
+};
+
+void helper_end_trace_callback(void* s, CPUARMState* env) {
+    trace_filter.is_filter_on = 0;
+    trace_filter.is_filter_by_pid = 0;
+    trace_filter.pid = 0;
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_on, trace_filter.pid);
+};
 
 static void arm_tr_disas_log(const DisasContextBase *dcbase, CPUState *cpu)
 {

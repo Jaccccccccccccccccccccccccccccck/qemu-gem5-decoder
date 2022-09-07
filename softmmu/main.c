@@ -44,6 +44,10 @@ int main(int argc, char **argv)
 #define main qemu_main
 #endif /* CONFIG_COCOA */
 
+#include "trace_filter/trace_filter.h"
+
+struct TraceFilter trace_filter;
+
 int main(int argc, char **argv, char **envp)
 {
     qemu_init(argc, argv, envp);

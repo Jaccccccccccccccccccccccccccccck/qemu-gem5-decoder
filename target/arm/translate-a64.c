@@ -2069,6 +2069,25 @@ static void disas_exc(DisasContext *s, uint32_t insn)
          */
         switch (op2_ll) {
         case 1:                                                     /* SVC */
+            if (imm16 == 0x9876) {
+                printf("[Trace Filter Start]");
+                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
+                gen_helper_start_trace_callback(dcs, cpu_env);
+                tcg_temp_free_ptr(dcs);
+                break;
+            } else if (imm16 == 0x9877) {
+                printf("[Trace Filter Get PID]");
+                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
+                gen_helper_start_trace_by_pid_callback(dcs, cpu_env);
+                tcg_temp_free_ptr(dcs);
+                break;
+            } else if (imm16 == 0x9875) {
+                printf("[Trace Filter End]");
+                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
+                gen_helper_end_trace_callback(dcs, cpu_env);
+                tcg_temp_free_ptr(dcs);
+                break;
+            }
             gen_ss_advance(s);
             gen_exception_insn(s, s->base.pc_next, EXCP_SWI,
                                syn_aa64_svc(imm16), default_exception_el(s));
@@ -14835,7 +14854,7 @@ static void aarch64_tr_init_disas_context(DisasContextBase *dcbase,
 static void aarch64_tr_tb_start(DisasContextBase *db, CPUState *cpu)
 {
     TCGv_ptr dcs = tcg_const_ptr(db->tb);
-    gen_helper_start_callback(dcs, cpu_env);
+    gen_helper_bb_start_callback(dcs, cpu_env);
     tcg_temp_free_ptr(dcs);
 }
 

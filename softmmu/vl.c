@@ -129,6 +129,8 @@
 
 #include "config-host.h"
 
+#include "trace_filter/trace_filter.h"
+
 #define MAX_VIRTIO_CONSOLES 1
 
 typedef struct BlockdevOptionsQueueEntry {
@@ -2719,6 +2721,7 @@ void qmp_x_exit_preconfig(Error **errp)
     }
 }
 
+extern struct TraceFilter trace_filter;
 void qemu_init(int argc, char **argv, char **envp)
 {
     QemuOpts *opts;
@@ -2729,6 +2732,17 @@ void qemu_init(int argc, char **argv, char **envp)
     MachineClass *machine_class;
     bool userconfig = true;
     FILE *vmstate_dump_file = NULL;
+
+    // trace_filter = {
+    //     .is_filter_on = 0,
+    //     .is_filter_by_pid = 0,
+    //     .pid = 0,
+    // };
+    trace_filter.is_filter_on = 0;
+    trace_filter.is_filter_by_pid = 0;
+    trace_filter.pid = 0;
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_on, trace_filter.pid);
+
 
     qemu_add_opts(&qemu_drive_opts);
     qemu_add_drive_opts(&qemu_legacy_drive_opts);
