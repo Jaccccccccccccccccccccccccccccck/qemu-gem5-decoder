@@ -2741,6 +2741,7 @@ void qemu_init(int argc, char **argv, char **envp)
     trace_filter.is_filter_on = 0;
     trace_filter.is_filter_by_pid = 0;
     trace_filter.pid = 0;
+    trace_filter.is_pid_on_trace_list = g_hash_table_new(g_int_hash, g_int_equal);
     printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_on, trace_filter.pid);
 
 

@@ -14851,10 +14851,16 @@ static void aarch64_tr_init_disas_context(DisasContextBase *dcbase,
     init_tmp_a64_array(dc);
 }
 
+#define HAVE_SWITCH      0xffff800000085be0UL
+
 static void aarch64_tr_tb_start(DisasContextBase *db, CPUState *cpu)
 {
     TCGv_ptr dcs = tcg_const_ptr(db->tb);
     gen_helper_bb_start_callback(dcs, cpu_env);
+    // if switch thread
+    if ( db->pc_first == HAVE_SWITCH ) {
+        gen_helper_switch_callback(dcs, cpu_env);
+    }
     tcg_temp_free_ptr(dcs);
 }
 

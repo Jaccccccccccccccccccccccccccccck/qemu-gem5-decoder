@@ -415,6 +415,13 @@ struct CPUState {
 
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
+
+    uint32_t current_pid;
+    uint32_t current_tgid;
+    uint32_t current_ppid;
+    uint32_t current_eltype;
+    uint32_t is_trace_on;
+    uint64_t current;
 };
 
 typedef QTAILQ_HEAD(CPUTailQ, CPUState) CPUTailQ;
