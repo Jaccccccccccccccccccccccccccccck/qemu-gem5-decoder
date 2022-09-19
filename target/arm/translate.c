@@ -36,8 +36,6 @@
 
 #include "exec/log.h"
 
-#include "trace_filter/trace_filter.h"
-#include <glib.h>
 
 #define ENABLE_ARCH_4T    arm_dc_feature(s, ARM_FEATURE_V4T)
 #define ENABLE_ARCH_5     arm_dc_feature(s, ARM_FEATURE_V5)
@@ -62,9 +60,6 @@ TCGv_i64 cpu_exclusive_addr;
 TCGv_i64 cpu_exclusive_val;
 
 #include "exec/gen-icount.h"
-
-#include "trace_filter/trace_filter.h"
-extern struct TraceFilter trace_filter;
 
 static const char * const regnames[] =
     { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
@@ -9793,108 +9788,6 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         } else {
             gen_goto_tb(dc, 1, dc->base.pc_next);
         }
-    }
-}
-
-/* get pid */
-static inline uint32_t get_pid(CPUState* cpu, CPUARMState* env, uint64_t current) {
-    uint32_t pid;
-    cpu_memory_rw_debug(cpu, (current + 1048), (uint8_t*)&pid, 4, 0);
-    return pid;
-}
-
-/* get tgid */
-static inline uint32_t get_tgid(CPUState* cpu, CPUARMState* env, uint64_t current) {
-    uint32_t tgid;
-    cpu_memory_rw_debug(cpu, (current + 1048 + 4), (uint8_t*)&tgid, 4, 0);
-    return tgid;
-}
-
-/* get ppid */
-static inline uint32_t get_ppid(CPUState* cpu, CPUARMState* env, uint64_t current, uint32_t pid) {
-    uint32_t ppid = 0;
-    uint64_t parent;
-
-    cpu_memory_rw_debug(cpu, (current + 1064), (uint8_t*)&parent, 8, 0);
-    ppid = get_pid(cpu, env, parent);
-
-    return ppid;
-}
-
-static int is_trace_on_by_pid(int current_pid, int current_tgid, int current_ppid) {
-    // result can be 0, 1, -1
-    int result = GPOINTER_TO_INT(g_hash_table_lookup(trace_filter.is_pid_on_trace_list, &current_pid));
-    if (result) {
-        // if(result == 1) {
-        //     printf("hashtable get pid success: %d in trace list\n", current_pid);
-        // } else {
-        //     printf("hashtable get pid success: %d not in trace list\n", current_pid);
-        // }
-        return result == 1;
-    } else {
-        if (current_tgid == trace_filter.pid || current_ppid == trace_filter.pid) {
-            // printf("hashtable get pid false, insert: %d in trace list\n", current_pid);
-            g_hash_table_insert(trace_filter.is_pid_on_trace_list, &current_pid, GINT_TO_POINTER(1));
-            return 1;
-        } else {
-            // printf("hashtable get pid false, insert %d not in trace list\n", current_pid);
-            g_hash_table_insert(trace_filter.is_pid_on_trace_list, &current_pid, GINT_TO_POINTER(-1));
-            return 0;
-        }
-    }
-}
-
-void helper_bb_start_callback(void* s, CPUARMState* env) {
-    // TranslationBlock* tb = s;
-    CPUState* cpu = env_cpu(env);
-    if (cpu->is_trace_on) {
-        // if (tb->tt != NULL) {
-        //     int cpuid = cpu->cpu_index;
-        //     int eltype = arm_current_el(env);
-        //     cpu->current_eltype = eltype;
-        //     if ((eltype != 1) && (eltype != 0)) {
-        //         /* interrupt or hyv */
-        //         return;
-        //     }
-        // }
-    }
-}
-
-void helper_start_trace_callback(void* s, CPUARMState* env) {
-    trace_filter.is_filter_on = 1;
-    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
-};
-
-void helper_start_trace_by_pid_callback(void* s, CPUARMState* env) {
-    trace_filter.pid = env->xregs[9];
-    trace_filter.is_filter_by_pid = true;
-    printf("[Trace Filter Get PID] ppid: %d, pid: %d, tid: %d\n", (int)env->xregs[8], (int)env->xregs[9], (int)env->xregs[10]);
-    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
-};
-
-void helper_end_trace_callback(void* s, CPUARMState* env) {
-    trace_filter.is_filter_on = 0;
-    trace_filter.is_filter_by_pid = 0;
-    trace_filter.pid = 0;
-    g_hash_table_remove_all(trace_filter.is_pid_on_trace_list);
-    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
-};
-
-void helper_switch_callback(void* s, CPUARMState* env) {
-    CPUState* cpu = env_cpu(env);
-    cpu->current = env->xregs[1];
-    cpu->current_pid = get_pid(cpu, env, cpu->current);
-    cpu->current_tgid = get_tgid(cpu, env, cpu->current);
-    cpu->current_ppid = get_ppid(cpu, env, cpu->current, cpu->current_pid);
-    // if (trace_filter.is_filter_on) {
-    //     printf("[Swith] pid: %d, tcgid: %d, ppid: %d\n", (int)(cpu->current_pid), (int)(cpu->current_tgid), (int)(cpu->current_ppid));
-    // }
-    if (trace_filter.is_filter_on && trace_filter.is_filter_by_pid) {
-        cpu->is_trace_on = is_trace_on_by_pid(cpu->current_pid, cpu->current_tgid, cpu->current_ppid);
-    } else if (trace_filter.is_filter_on && !trace_filter.is_filter_by_pid) {
-        cpu->is_trace_on = true;
-    } else {
-        cpu->is_trace_on = false;
     }
 }
 

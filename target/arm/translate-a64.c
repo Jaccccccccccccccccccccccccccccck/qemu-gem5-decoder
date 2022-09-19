@@ -38,6 +38,8 @@
 #include "translate-a64.h"
 #include "qemu/atomic128.h"
 
+#include "trace_filter/trace_filter.h"
+
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
 
@@ -2071,21 +2073,15 @@ static void disas_exc(DisasContext *s, uint32_t insn)
         case 1:                                                     /* SVC */
             if (imm16 == 0x9876) {
                 printf("[Trace Filter Start]");
-                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
-                gen_helper_start_trace_callback(dcs, cpu_env);
-                tcg_temp_free_ptr(dcs);
+                gen_helper_start_trace_callback(tcg_const_ptr(s->base.tb), cpu_env);
                 break;
             } else if (imm16 == 0x9877) {
                 printf("[Trace Filter Get PID]");
-                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
-                gen_helper_start_trace_by_pid_callback(dcs, cpu_env);
-                tcg_temp_free_ptr(dcs);
+                gen_helper_start_trace_by_pid_callback(tcg_const_ptr(s->base.tb), cpu_env);
                 break;
             } else if (imm16 == 0x9875) {
                 printf("[Trace Filter End]");
-                TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
-                gen_helper_end_trace_callback(dcs, cpu_env);
-                tcg_temp_free_ptr(dcs);
+                gen_helper_end_trace_callback(tcg_const_ptr(s->base.tb), cpu_env);
                 break;
             }
             gen_ss_advance(s);
@@ -14676,6 +14672,12 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     s->pc_curr = s->base.pc_next;
     insn = arm_ldl_code(env, s->base.pc_next, s->sctlr_b);
     s->insn = insn;
+
+    struct tb_inst_info *ptt = s->base.tb->tt;
+    ptt->ti[ptt->insn_num].pc = s->pc_curr;
+    ptt->ti[ptt->insn_num].instr = s->insn;
+    ptt->insn_num++;
+
     s->base.pc_next += 4;
 
     s->fp_access_checked = false;
@@ -14901,7 +14903,7 @@ static void aarch64_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 static void aarch64_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
-
+    gen_helper_bb_end_callback(tcg_const_ptr(dcbase->tb), cpu_env);
     if (unlikely(dc->base.singlestep_enabled || dc->ss_active)) {
         /* Note that this means single stepping WFI doesn't halt the CPU.
          * For conditional branch insns this is harmless unreachable code as
@@ -14980,6 +14982,162 @@ static void aarch64_tr_disas_log(const DisasContextBase *dcbase,
 
     qemu_log("IN: %s\n", lookup_symbol(dc->base.pc_first));
     log_target_disas(cpu, dc->base.pc_first, dc->base.tb->size);
+}
+
+extern struct TraceFilter trace_filter;
+
+/* get pid */
+static inline uint32_t get_pid(CPUState* cpu, CPUARMState* env, uint64_t current) {
+    uint32_t pid;
+    cpu_memory_rw_debug(cpu, (current + 1048), (uint8_t*)&pid, 4, 0);
+    return pid;
+}
+
+/* get tgid */
+static inline uint32_t get_tgid(CPUState* cpu, CPUARMState* env, uint64_t current) {
+    uint32_t tgid;
+    cpu_memory_rw_debug(cpu, (current + 1048 + 4), (uint8_t*)&tgid, 4, 0);
+    return tgid;
+}
+
+/* get ppid */
+static inline uint32_t get_ppid(CPUState* cpu, CPUARMState* env, uint64_t current, uint32_t pid) {
+    uint32_t ppid = 0;
+    uint64_t parent;
+
+    cpu_memory_rw_debug(cpu, (current + 1064), (uint8_t*)&parent, 8, 0);
+    ppid = get_pid(cpu, env, parent);
+
+    return ppid;
+}
+
+static int is_trace_on_by_pid(int current_pid, int current_tgid, int current_ppid) {
+    // result can be 0, 1, -1
+    int result = GPOINTER_TO_INT(g_hash_table_lookup(trace_filter.is_pid_on_trace_list, &current_pid));
+    if (result) {
+        // if(result == 1) {
+        //     printf("hashtable get pid success: %d in trace list\n", current_pid);
+        // } else {
+        //     printf("hashtable get pid success: %d not in trace list\n", current_pid);
+        // }
+        return result == 1;
+    } else {
+        if (current_tgid == trace_filter.pid || current_ppid == trace_filter.pid) {
+            // printf("hashtable get pid false, insert: %d in trace list\n", current_pid);
+            g_hash_table_insert(trace_filter.is_pid_on_trace_list, &current_pid, GINT_TO_POINTER(1));
+            return 1;
+        } else {
+            // printf("hashtable get pid false, insert %d not in trace list\n", current_pid);
+            g_hash_table_insert(trace_filter.is_pid_on_trace_list, &current_pid, GINT_TO_POINTER(-1));
+            return 0;
+        }
+    }
+}
+
+void helper_bb_start_callback(void* s, CPUARMState* env) {
+    // TranslationBlock* tb = s;
+    CPUState* cpu = env_cpu(env);
+	cpu->current_eltype = arm_current_el(env);
+    cpu->sendbuf->pid = cpu->current_pid;
+    cpu->sendbuf->tgid = cpu->current_tgid;
+    cpu->sendbuf->cpu_id = cpu->cpu_index;
+    if (cpu->is_trace_on) {
+        // if (tb->tt != NULL) {
+        //     int cpuid = cpu->cpu_index;
+        //     int eltype = arm_current_el(env);
+        //     cpu->current_eltype = eltype;
+        //     if ((eltype != 1) && (eltype != 0)) {
+        //         /* interrupt or hyv */
+        //         return;
+        //     }
+        // }
+    }
+}
+
+extern inline void printTrace(tb_info_t* tb_info, tb_inst_info_t* tb_inst_info);
+extern inline void reset_tb_info(tb_info_t* tb_info);
+void helper_bb_end_callback(void* s, CPUARMState* env) {
+    CPUState* cpu = env_cpu(env);
+    if (cpu->is_trace_on && cpu->current_eltype == 0) {
+        TranslationBlock* tb = s;
+        cpu->sendbuf->real_insn_num = tb->tt->insn_num;
+        printTrace(cpu->sendbuf, tb->tt);
+        reset_tb_info(cpu->sendbuf);
+    }
+}
+
+void helper_start_trace_callback(void* s, CPUARMState* env) {
+    trace_filter.is_filter_on = 1;
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
+};
+
+void helper_start_trace_by_pid_callback(void* s, CPUARMState* env) {
+    trace_filter.pid = env->xregs[9];
+    trace_filter.is_filter_by_pid = true;
+    printf("[Trace Filter Get PID] ppid: %d, pid: %d, tid: %d\n", (int)env->xregs[8], (int)env->xregs[9], (int)env->xregs[10]);
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
+};
+
+void helper_end_trace_callback(void* s, CPUARMState* env) {
+    trace_filter.is_filter_on = 0;
+    trace_filter.is_filter_by_pid = 0;
+    trace_filter.pid = 0;
+    g_hash_table_remove_all(trace_filter.is_pid_on_trace_list);
+    printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
+};
+
+void helper_switch_callback(void* s, CPUARMState* env) {
+    CPUState* cpu = env_cpu(env);
+    cpu->current = env->xregs[1];
+    cpu->current_pid = get_pid(cpu, env, cpu->current);
+    cpu->current_tgid = get_tgid(cpu, env, cpu->current);
+    cpu->current_ppid = get_ppid(cpu, env, cpu->current, cpu->current_pid);
+    if (trace_filter.is_filter_on) {
+        printf("[Swith] pid: %d, tcgid: %d, ppid: %d\n", (int)(cpu->current_pid), (int)(cpu->current_tgid), (int)(cpu->current_ppid));
+    }
+    if (trace_filter.is_filter_on && trace_filter.is_filter_by_pid) {
+        cpu->is_trace_on = is_trace_on_by_pid(cpu->current_pid, cpu->current_tgid, cpu->current_ppid);
+    } else if (trace_filter.is_filter_on && !trace_filter.is_filter_by_pid) {
+        cpu->is_trace_on = true;
+    } else {
+        cpu->is_trace_on = false;
+    }
+}
+
+void helper_load_callback(CPUARMState* env, uint64_t addr) {
+    CPUState* cpu = env_cpu(env);
+    struct mem_info* pinfo;
+    /* load mem */
+    if (cpu->is_trace_on) {
+        if (cpu->sendbuf->mem_num >= MAX_MEMINFOS) {
+            //printf("mem num[%d]\n", cpu->sendbuf->mem_num);
+        } else {
+            pinfo = &(cpu->sendbuf->mi[cpu->sendbuf->mem_num]);
+            cpu->sendbuf->mem_num++;
+            pinfo->type = MEM_LOAD;
+            int mmu_idx = cpu_mmu_index(env, false);
+            void* hva = tlb_vaddr_to_host(env, addr, MMU_DATA_LOAD, mmu_idx);
+            pinfo->addr = hva ? (unsigned long)hva : addr;
+        }
+    }
+}
+
+void helper_store_callback(CPUARMState* env, uint64_t addr) {
+    struct mem_info* pinfo;
+    /* store mem */
+    CPUState* cpu = env_cpu(env);
+    if (cpu->is_trace_on) {
+        if (cpu->sendbuf->mem_num >= MAX_MEMINFOS) {
+            //printf("mem num[%d]\n", cpu->sendbuf->mem_num);
+        } else {
+            pinfo = &(cpu->sendbuf->mi[cpu->sendbuf->mem_num]);
+            cpu->sendbuf->mem_num++;
+            pinfo->type = MEM_STORE;
+            int mmu_idx = cpu_mmu_index(env, false);
+            void* hva = tlb_vaddr_to_host(env, addr, MMU_DATA_STORE, mmu_idx);
+            pinfo->addr = hva ? (unsigned long)hva : addr;
+        }
+    }
 }
 
 const TranslatorOps aarch64_translator_ops = {

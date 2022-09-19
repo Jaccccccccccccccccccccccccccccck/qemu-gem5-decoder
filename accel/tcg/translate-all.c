@@ -1466,6 +1466,8 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
 
     tcg_func_start(tcg_ctx);
 
+    tb->tt = malloc(sizeof(struct tb_inst_info));
+
     tcg_ctx->cpu = env_cpu(env);
     gen_intermediate_code(cpu, tb, max_insns);
     assert(tb->size != 0);

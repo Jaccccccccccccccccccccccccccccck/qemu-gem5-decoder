@@ -32,6 +32,7 @@
 #include "kvm_arm.h"
 #include "qapi/visitor.h"
 #include "hw/qdev-properties.h"
+#include "trace_filter/trace_filter.h"
 
 
 #ifndef CONFIG_USER_ONLY
@@ -908,9 +909,15 @@ static void aarch64_cpu_class_init(ObjectClass *oc, void *data)
                                           "execution state ");
 }
 
+extern inline tb_info_t* init_new_tb_info(void);
 static void aarch64_cpu_instance_init(Object *obj)
 {
     ARMCPUClass *acc = ARM_CPU_GET_CLASS(obj);
+
+    ARMCPU *cpu = ARM_CPU(obj);
+    CPUState* cpu_state = env_cpu(&(cpu->env));
+    cpu_state->sendbuf = init_new_tb_info();
+    cpu_state->is_trace_on = 0;
 
     acc->info->initfn(obj);
     arm_cpu_post_init(obj);
