@@ -38,7 +38,7 @@ static inline uint32_t ring_buf_is_full(ring_buf_t* ring_buf) {
 }
 
 static inline void* sing_buf_get_cur_write_addr(ring_buf_t* ring_buf) {
-    return (void*)(ring_buf + sizeof(ring_buf_t) + ring_buf->index_w * ring_buf->item_size);
+    return (void*)((void*)ring_buf + sizeof(ring_buf_t) + ring_buf->index_w * ring_buf->item_size);
 }
 
 static inline void ring_buf_print_status(ring_buf_t* ring_buf) {
