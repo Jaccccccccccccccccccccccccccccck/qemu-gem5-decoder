@@ -39,6 +39,8 @@
 #include "qemu/atomic128.h"
 
 #include "trace_filter/trace_filter.h"
+#include "trace_filter/ring_buf.h"
+extern ring_buf_t *ring_buf_by_cpu[1024];
 
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
@@ -15062,6 +15064,11 @@ void helper_bb_end_callback(void* s, CPUARMState* env) {
         TranslationBlock* tb = s;
         cpu->sendbuf->real_insn_num = tb->tt->insn_num;
         printTrace(cpu->sendbuf, tb->tt);
+        while (true) {
+            if (ring_buf_in(ring_buf_by_cpu[cpu->cpu_index], (void*)cpu->sendbuf)){
+                break;
+            }
+        }
         reset_tb_info(cpu->sendbuf);
     }
 }
