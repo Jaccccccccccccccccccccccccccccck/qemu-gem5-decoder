@@ -141,6 +141,12 @@ static void mux_chr_be_event(Chardev *chr, QEMUChrEvent event)
     }
 }
 
+void shm_clean(void);
+void shm_clean(void) {
+    printf("rm all ipc shm.\n");
+    system("ipcrm -a");
+}
+
 static int mux_proc_byte(Chardev *chr, MuxChardev *d, int ch)
 {
     if (d->term_got_escape) {
@@ -157,6 +163,7 @@ static int mux_proc_byte(Chardev *chr, MuxChardev *d, int ch)
             {
                  const char *term =  "QEMU: Terminated\n\r";
                  qemu_chr_write_all(chr, (uint8_t *)term, strlen(term));
+                 shm_clean();
                  exit(0);
                  break;
             }

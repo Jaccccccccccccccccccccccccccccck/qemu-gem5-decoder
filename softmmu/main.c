@@ -45,8 +45,10 @@ int main(int argc, char **argv)
 #endif /* CONFIG_COCOA */
 
 #include "trace_filter/trace_filter.h"
+#include "trace_filter/ring_buf.h"
 
 struct TraceFilter trace_filter;
+ring_buf_t* ring_buf_by_cpu[1024];
 
 int main(int argc, char **argv, char **envp)
 {

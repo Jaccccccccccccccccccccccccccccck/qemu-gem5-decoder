@@ -2057,6 +2057,7 @@ stub_ss = ss.source_set()
 trace_ss = ss.source_set()
 user_ss = ss.source_set()
 util_ss = ss.source_set()
+trace_filter_ss = ss.source_set()
 
 # accel modules
 qtest_module_ss = ss.source_set()
@@ -2189,6 +2190,7 @@ subdir('qom')
 subdir('authz')
 subdir('crypto')
 subdir('ui')
+subdir('trace_filter')
 
 
 if enable_modules
@@ -2197,6 +2199,7 @@ if enable_modules
 endif
 
 stub_ss = stub_ss.apply(config_all, strict: false)
+trace_filter_ss = trace_filter_ss.apply(config_all, strict: false)
 
 util_ss.add_all(trace_ss)
 util_ss = util_ss.apply(config_all, strict: false)
@@ -2503,7 +2506,7 @@ foreach m : block_mods + softmmu_mods
                 install_dir: qemu_moddir)
 endforeach
 
-softmmu_ss.add(authz, blockdev, chardev, crypto, io, qmp)
+softmmu_ss.add(authz, blockdev, chardev, crypto, io, qmp, trace_filter_ss.sources())
 common_ss.add(qom, qemuutil)
 
 common_ss.add_all(when: 'CONFIG_SOFTMMU', if_true: [softmmu_ss])

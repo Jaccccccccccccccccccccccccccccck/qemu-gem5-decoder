@@ -130,6 +130,9 @@
 #include "config-host.h"
 
 #include "trace_filter/trace_filter.h"
+#include "trace_filter/ring_buf.h"
+extern struct TraceFilter trace_filter;
+extern ring_buf_t *ring_buf_by_cpu[1024];
 
 #define MAX_VIRTIO_CONSOLES 1
 
@@ -2652,6 +2655,17 @@ static void qemu_create_cli_devices(void)
 static void qemu_machine_creation_done(void)
 {
     MachineState *machine = MACHINE(qdev_get_machine());
+    // init ring buffer for each cpu
+    key_t key = ftok("/dev/null", 0);
+    if (key == -1) {
+        perror("ftok error");
+        exit(1);
+    }
+    printf("smp.cpus=[%d]\n", machine->smp.cpus);
+    for (int i = 0; i < machine->smp.cpus; i++) {
+        printf("init share mem ring buffer, cpu index: %d, key = %d\n", i, key + i);
+        ring_buf_by_cpu[i] = ring_buf_shm_malloc(key + i, sizeof(tb_info_t), 300);
+    }
 
     /* Did we create any drives that we failed to create a device for? */
     drive_check_orphaned();
@@ -2721,7 +2735,6 @@ void qmp_x_exit_preconfig(Error **errp)
     }
 }
 
-extern struct TraceFilter trace_filter;
 void qemu_init(int argc, char **argv, char **envp)
 {
     QemuOpts *opts;
@@ -2733,11 +2746,7 @@ void qemu_init(int argc, char **argv, char **envp)
     bool userconfig = true;
     FILE *vmstate_dump_file = NULL;
 
-    // trace_filter = {
-    //     .is_filter_on = 0,
-    //     .is_filter_by_pid = 0,
-    //     .pid = 0,
-    // };
+    // init trace_filter
     trace_filter.is_filter_on = 0;
     trace_filter.is_filter_by_pid = 0;
     trace_filter.pid = 0;
