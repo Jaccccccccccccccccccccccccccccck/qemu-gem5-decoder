@@ -15039,10 +15039,10 @@ static int is_trace_on_by_pid(int current_pid, int current_tgid, int current_ppi
 void helper_bb_start_callback(void* s, CPUARMState* env) {
     // TranslationBlock* tb = s;
     CPUState* cpu = env_cpu(env);
-	cpu->current_eltype = arm_current_el(env);
     cpu->sendbuf->pid = cpu->current_pid;
     cpu->sendbuf->tgid = cpu->current_tgid;
     cpu->sendbuf->cpu_id = cpu->cpu_index;
+    cpu->sendbuf->insn_type = arm_current_el(env);
     if (cpu->is_trace_on) {
         // if (tb->tt != NULL) {
         //     int cpuid = cpu->cpu_index;
@@ -15056,14 +15056,13 @@ void helper_bb_start_callback(void* s, CPUARMState* env) {
     }
 }
 
-extern inline void printTrace(tb_info_t* tb_info, tb_inst_info_t* tb_inst_info);
-extern inline void reset_tb_info(tb_info_t* tb_info);
 void helper_bb_end_callback(void* s, CPUARMState* env) {
     CPUState* cpu = env_cpu(env);
-    if (cpu->is_trace_on && cpu->current_eltype == 0) {
+    if (cpu->is_trace_on) {
         TranslationBlock* tb = s;
         cpu->sendbuf->real_insn_num = tb->tt->insn_num;
-        printTrace(cpu->sendbuf, tb->tt);
+        // print_tb_info(cpu->sendbuf);
+        // printTrace(cpu->sendbuf, tb->tt);
         while (true) {
             if (ring_buf_in(ring_buf_by_cpu[cpu->cpu_index], (void*)cpu->sendbuf)){
                 break;
@@ -15081,6 +15080,10 @@ void helper_start_trace_callback(void* s, CPUARMState* env) {
 void helper_start_trace_by_pid_callback(void* s, CPUARMState* env) {
     trace_filter.pid = env->xregs[9];
     trace_filter.is_filter_by_pid = true;
+    for (int i = 0; (i < 1024) && ring_buf_by_cpu[i]; i++) {
+        ring_buf_by_cpu[i]->trace_end = 0;
+        printf("start trace cpu: %d\n", i);
+    }
     printf("[Trace Filter Get PID] ppid: %d, pid: %d, tid: %d\n", (int)env->xregs[8], (int)env->xregs[9], (int)env->xregs[10]);
     printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
 };
@@ -15089,6 +15092,10 @@ void helper_end_trace_callback(void* s, CPUARMState* env) {
     trace_filter.is_filter_on = 0;
     trace_filter.is_filter_by_pid = 0;
     trace_filter.pid = 0;
+    for (int i = 0; (i < 1024) && ring_buf_by_cpu[i]; i++) {
+        ring_buf_by_cpu[i]->trace_end = 1;
+        printf("end trace cpu: %d\n", i);
+    }
     g_hash_table_remove_all(trace_filter.is_pid_on_trace_list);
     printf("[Trace Filter Status] is_filter_on: %d, is_filter_by_pid: %d, pid: %d\n", trace_filter.is_filter_on, trace_filter.is_filter_by_pid, trace_filter.pid);
 };

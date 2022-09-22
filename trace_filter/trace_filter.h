@@ -1,5 +1,8 @@
 #ifndef TRACE_FILTER_H
 #define TRACE_FILTER_H
+#include <stdio.h>
+#include <glib.h>
+#include <stdbool.h>
 
 struct TraceFilter {
     bool is_filter_on;
@@ -46,7 +49,11 @@ struct tb_inst_info {
 };
 typedef struct tb_inst_info tb_inst_info_t;
 
-inline void printTrace(tb_info_t* tb_info, tb_inst_info_t* tb_inst_info) {
+static inline void print_tb_info(tb_info_t* tb_info) {
+    printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num);
+}
+
+static inline void printTrace(tb_info_t* tb_info, tb_inst_info_t* tb_inst_info) {
     printf("cpu: %d, pid: %d, tgid:%d, inst num:%d\n", tb_info->cpu_id, tb_info->pid, tb_info->tgid, tb_info->real_insn_num);
     for(int i = 0; i < tb_inst_info->insn_num; i++) {
         printf("%lx %x\n", tb_inst_info->ti[i].pc, tb_inst_info->ti[i].instr);
@@ -54,7 +61,7 @@ inline void printTrace(tb_info_t* tb_info, tb_inst_info_t* tb_inst_info) {
     printf("\n");
 }
 
-inline tb_info_t* init_new_tb_info(void) {
+static inline tb_info_t* init_new_tb_info(void) {
     tb_info_t* tb_info = malloc(sizeof(tb_info_t));
     tb_info->real_insn_num = 0;
     tb_info->cpu_id = 0;
@@ -67,7 +74,7 @@ inline tb_info_t* init_new_tb_info(void) {
     return tb_info;
 }
 
-inline void reset_tb_info(tb_info_t* tb_info) {
+static inline void reset_tb_info(tb_info_t* tb_info) {
     tb_info->real_insn_num = 0;
     tb_info->cpu_id = 0;
     tb_info->insn_type = 0; /* tb_insn's mode,system = 1,user = 0 */

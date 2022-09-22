@@ -2662,9 +2662,13 @@ static void qemu_machine_creation_done(void)
         exit(1);
     }
     printf("smp.cpus=[%d]\n", machine->smp.cpus);
-    for (int i = 0; i < machine->smp.cpus; i++) {
-        printf("init share mem ring buffer, cpu index: %d, key = %d\n", i, key + i);
-        ring_buf_by_cpu[i] = ring_buf_shm_malloc(key + i, sizeof(tb_info_t), 300);
+    for (int i = 0; i < 1024; i++) {
+        if (i < machine->smp.cpus) {
+            printf("init share mem ring buffer, cpu index: %d, key = %x\n", i, key + i);
+            ring_buf_by_cpu[i] = ring_buf_shm_malloc(key + i, sizeof(tb_info_t), 300);
+        } else {
+            ring_buf_by_cpu[i] = NULL;
+        }
     }
 
     /* Did we create any drives that we failed to create a device for? */

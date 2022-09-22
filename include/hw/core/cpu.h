@@ -419,7 +419,6 @@ struct CPUState {
     uint32_t current_pid;
     uint32_t current_tgid;
     uint32_t current_ppid;
-    uint32_t current_eltype;  // 1 for kernel, 0 for user
     uint32_t is_trace_on;
     uint64_t current;
     struct tb_info *sendbuf;

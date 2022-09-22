@@ -1,0 +1,1 @@
+gcc `pkg-config --cflags glib-2.0` -g  -o test_receiver test_receiver.c trace_filter.h ring_buf.c `pkg-config --libs glib-2.0`

@@ -1,4 +1,4 @@
-#include "trace_filter/ring_buf.h"
+#include "ring_buf.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/ipc.h>
@@ -18,6 +18,7 @@ ring_buf_t* ring_buf_shm_malloc(key_t key, size_t item_size, size_t item_num) {
     ring_buf->size = item_num;
     ring_buf->item_size = item_size;
     ring_buf->shm_id = shm_id;
+    ring_buf->trace_end = 0;
     return ring_buf;
 }
 
@@ -30,9 +31,9 @@ int ring_buf_in(ring_buf_t* ring_buf, void* item) {
     return 0;
 }
 
-int ring_buf_out(ring_buf_t* ring_buf) {
+int ring_buf_out(ring_buf_t* ring_buf, void* addr) {
     if (!ring_buf_is_empty(ring_buf)) {
-        sing_buf_get_cur_write_addr(ring_buf);
+        memcpy(addr, sing_buf_get_cur_read_addr(ring_buf), ring_buf->item_size);
         ring_buf->index_r = (ring_buf->index_r + 1) % ring_buf->size;
         return 1;
     }
