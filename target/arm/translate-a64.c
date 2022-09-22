@@ -15099,9 +15099,9 @@ void helper_switch_callback(void* s, CPUARMState* env) {
     cpu->current_pid = get_pid(cpu, env, cpu->current);
     cpu->current_tgid = get_tgid(cpu, env, cpu->current);
     cpu->current_ppid = get_ppid(cpu, env, cpu->current, cpu->current_pid);
-    if (trace_filter.is_filter_on) {
-        printf("[Swith] pid: %d, tcgid: %d, ppid: %d\n", (int)(cpu->current_pid), (int)(cpu->current_tgid), (int)(cpu->current_ppid));
-    }
+    // if (trace_filter.is_filter_on) {
+    //     printf("[Swith] pid: %d, tcgid: %d, ppid: %d\n", (int)(cpu->current_pid), (int)(cpu->current_tgid), (int)(cpu->current_ppid));
+    // }
     if (trace_filter.is_filter_on && trace_filter.is_filter_by_pid) {
         cpu->is_trace_on = is_trace_on_by_pid(cpu->current_pid, cpu->current_tgid, cpu->current_ppid);
     } else if (trace_filter.is_filter_on && !trace_filter.is_filter_by_pid) {
