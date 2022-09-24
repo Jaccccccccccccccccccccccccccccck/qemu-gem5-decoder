@@ -57,8 +57,10 @@ void translator_loop(const TranslatorOps *ops, DisasContextBase *db,
     db->max_insns = max_insns;
     db->singlestep_enabled = cflags & CF_SINGLE_STEP;
 
-    tb->tt->pc_start = tb->pc;
-    tb->tt->insn_num = 0;
+    if (tb->tt) {
+        tb->tt->pc_start = tb->pc;
+        tb->tt->insn_num = 0;
+    }
 
     ops->init_disas_context(db, cpu);
     tcg_debug_assert(db->is_jmp == DISAS_NEXT);  /* no early exit */

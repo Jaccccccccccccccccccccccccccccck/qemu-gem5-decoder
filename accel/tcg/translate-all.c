@@ -61,6 +61,10 @@
 #include "tb-context.h"
 #include "internal.h"
 
+#include "trace_filter/trace_filter.h"
+#include "trace_filter/shm.h"
+extern struct TraceFilter trace_filter;
+
 /* #define DEBUG_TB_INVALIDATE */
 /* #define DEBUG_TB_FLUSH */
 /* make various TB consistency checks */
@@ -961,6 +965,15 @@ static gboolean tb_host_size_iter(gpointer key, gpointer value, gpointer data)
     return false;
 }
 
+static gboolean tb_tt_iter(gpointer key, gpointer value, gpointer data) {
+    TranslationBlock* tb = value;
+    if (tb->tt) {
+        shm_free(SHM_ADDR_TO_OFFT(tb->tt));
+        tb->tt = NULL;
+    }
+    return false;
+}
+
 /* flush all the translation blocks */
 static void do_tb_flush(CPUState *cpu, run_on_cpu_data tb_flush_count)
 {
@@ -983,6 +996,8 @@ static void do_tb_flush(CPUState *cpu, run_on_cpu_data tb_flush_count)
         printf("qemu: flush code_size=%zu nb_tbs=%zu avg_tb_size=%zu\n",
                tcg_code_size(), nb_tbs, nb_tbs > 0 ? host_size / nb_tbs : 0);
     }
+
+    tcg_tb_foreach(tb_tt_iter, NULL);
 
     CPU_FOREACH(cpu) {
         cpu_tb_jmp_cache_clear(cpu);
@@ -1218,7 +1233,10 @@ static void do_tb_phys_invalidate(TranslationBlock *tb, bool rm_from_page_list)
 
     /* suppress any remaining jumps to this TB */
     tb_jmp_unlink(tb);
-
+    if (tb->tt) {
+        shm_free(SHM_ADDR_TO_OFFT(tb->tt));
+        tb->tt = NULL;
+    }
     qatomic_set(&tb_ctx.tb_phys_invalidate_count,
                 tb_ctx.tb_phys_invalidate_count + 1);
 }
@@ -1466,7 +1484,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
 
     tcg_func_start(tcg_ctx);
 
-    tb->tt = malloc(sizeof(struct tb_inst_info));
+    tb->tt = SHM_OFFT_TO_ADDR(shm_malloc(sizeof(struct tb_inst_info)));
 
     tcg_ctx->cpu = env_cpu(env);
     gen_intermediate_code(cpu, tb, max_insns);

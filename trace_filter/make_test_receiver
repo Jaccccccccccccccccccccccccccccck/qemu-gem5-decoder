@@ -1,1 +1,1 @@
-gcc `pkg-config --cflags glib-2.0` -g  -o test_receiver test_receiver.c trace_filter.h ring_buf.c `pkg-config --libs glib-2.0`
+gcc -g -o test_receiver test_receiver.c ring_buf.c -L. -l:libshm_alloc.so -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0

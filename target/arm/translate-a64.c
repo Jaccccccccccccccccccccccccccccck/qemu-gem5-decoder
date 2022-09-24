@@ -40,7 +40,9 @@
 
 #include "trace_filter/trace_filter.h"
 #include "trace_filter/ring_buf.h"
+#include "trace_filter/shm.h"
 extern ring_buf_t *ring_buf_by_cpu[1024];
+extern struct TraceFilter trace_filter;
 
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
@@ -14675,7 +14677,8 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     insn = arm_ldl_code(env, s->base.pc_next, s->sctlr_b);
     s->insn = insn;
 
-    struct tb_inst_info *ptt = s->base.tb->tt;
+    // why cpu->is_trace_on and trace_filter.is_filter_on is always false here?
+    struct tb_inst_info* ptt = s->base.tb->tt;
     ptt->ti[ptt->insn_num].pc = s->pc_curr;
     ptt->ti[ptt->insn_num].instr = s->insn;
     ptt->insn_num++;
@@ -14860,11 +14863,11 @@ static void aarch64_tr_init_disas_context(DisasContextBase *dcbase,
 static void aarch64_tr_tb_start(DisasContextBase *db, CPUState *cpu)
 {
     TCGv_ptr dcs = tcg_const_ptr(db->tb);
-    gen_helper_bb_start_callback(dcs, cpu_env);
-    // if switch thread
+        // if switch thread
     if ( db->pc_first == HAVE_SWITCH ) {
         gen_helper_switch_callback(dcs, cpu_env);
     }
+    gen_helper_bb_start_callback(dcs, cpu_env);
     tcg_temp_free_ptr(dcs);
 }
 
@@ -14986,8 +14989,6 @@ static void aarch64_tr_disas_log(const DisasContextBase *dcbase,
     log_target_disas(cpu, dc->base.pc_first, dc->base.tb->size);
 }
 
-extern struct TraceFilter trace_filter;
-
 /* get pid */
 static inline uint32_t get_pid(CPUState* cpu, CPUARMState* env, uint64_t current) {
     uint32_t pid;
@@ -15037,38 +15038,31 @@ static int is_trace_on_by_pid(int current_pid, int current_tgid, int current_ppi
 }
 
 void helper_bb_start_callback(void* s, CPUARMState* env) {
-    // TranslationBlock* tb = s;
+    TranslationBlock* tb = s;
     CPUState* cpu = env_cpu(env);
-    cpu->sendbuf->pid = cpu->current_pid;
-    cpu->sendbuf->tgid = cpu->current_tgid;
-    cpu->sendbuf->cpu_id = cpu->cpu_index;
-    cpu->sendbuf->insn_type = arm_current_el(env);
     if (cpu->is_trace_on) {
-        // if (tb->tt != NULL) {
-        //     int cpuid = cpu->cpu_index;
-        //     int eltype = arm_current_el(env);
-        //     cpu->current_eltype = eltype;
-        //     if ((eltype != 1) && (eltype != 0)) {
-        //         /* interrupt or hyv */
-        //         return;
-        //     }
-        // }
+        cpu->sendbuf->pid = cpu->current_pid;
+        cpu->sendbuf->tgid = cpu->current_tgid;
+        cpu->sendbuf->cpu_id = cpu->cpu_index;
+        cpu->sendbuf->insn_type = arm_current_el(env);
+        cpu->sendbuf->mem_num = 0;
+        cpu->sendbuf->tb_inst_info = tb->tt;
     }
 }
 
 void helper_bb_end_callback(void* s, CPUARMState* env) {
+    // TranslationBlock* tb = s;
     CPUState* cpu = env_cpu(env);
     if (cpu->is_trace_on) {
         TranslationBlock* tb = s;
         cpu->sendbuf->real_insn_num = tb->tt->insn_num;
-        // print_tb_info(cpu->sendbuf);
-        // printTrace(cpu->sendbuf, tb->tt);
+        print_tb_info(cpu->sendbuf);
         while (true) {
-            if (ring_buf_in(ring_buf_by_cpu[cpu->cpu_index], (void*)cpu->sendbuf)){
+            if (ring_buf_in(ring_buf_by_cpu[cpu->cpu_index], (void*)cpu->sendbuf)) {
                 break;
             }
         }
-        reset_tb_info(cpu->sendbuf);
+        // reset_tb_info(cpu->sendbuf);
     }
 }
 
@@ -15106,9 +15100,6 @@ void helper_switch_callback(void* s, CPUARMState* env) {
     cpu->current_pid = get_pid(cpu, env, cpu->current);
     cpu->current_tgid = get_tgid(cpu, env, cpu->current);
     cpu->current_ppid = get_ppid(cpu, env, cpu->current, cpu->current_pid);
-    // if (trace_filter.is_filter_on) {
-    //     printf("[Swith] pid: %d, tcgid: %d, ppid: %d\n", (int)(cpu->current_pid), (int)(cpu->current_tgid), (int)(cpu->current_ppid));
-    // }
     if (trace_filter.is_filter_on && trace_filter.is_filter_by_pid) {
         cpu->is_trace_on = is_trace_on_by_pid(cpu->current_pid, cpu->current_tgid, cpu->current_ppid);
     } else if (trace_filter.is_filter_on && !trace_filter.is_filter_by_pid) {

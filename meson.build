@@ -2506,6 +2506,10 @@ foreach m : block_mods + softmmu_mods
                 install_dir: qemu_moddir)
 endforeach
 
+c = meson.get_compiler('c')
+lib_shm_dir = meson.current_source_dir() + '/trace_filter/'
+libshmalloc = c.find_library('libshm_alloc', dirs: lib_shm_dir)
+
 softmmu_ss.add(authz, blockdev, chardev, crypto, io, qmp, trace_filter_ss.sources())
 common_ss.add(qom, qemuutil)
 
@@ -2677,7 +2681,7 @@ foreach target : target_dirs
     emulator = executable(exe_name, exe['sources'],
                install: true,
                c_args: c_args,
-               dependencies: arch_deps + deps + exe['dependencies'] + gem5_added_libs,
+               dependencies: arch_deps + deps + exe['dependencies'] + gem5_added_libs + [libshmalloc,],
                objects: lib.extract_all_objects(recursive: true),
                link_language: link_language,
                link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),

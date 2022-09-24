@@ -129,6 +129,7 @@
 
 #include "config-host.h"
 
+#include "trace_filter/shm.h"
 #include "trace_filter/trace_filter.h"
 #include "trace_filter/ring_buf.h"
 extern struct TraceFilter trace_filter;
@@ -2655,7 +2656,7 @@ static void qemu_create_cli_devices(void)
 static void qemu_machine_creation_done(void)
 {
     MachineState *machine = MACHINE(qdev_get_machine());
-    // init ring buffer for each cpu
+    // init ring buffer (shared memory) for each cpu
     key_t key = ftok("/dev/null", 0);
     if (key == -1) {
         perror("ftok error");
@@ -2668,6 +2669,21 @@ static void qemu_machine_creation_done(void)
             ring_buf_by_cpu[i] = ring_buf_shm_malloc(key + i, sizeof(tb_info_t), 300);
         } else {
             ring_buf_by_cpu[i] = NULL;
+        }
+    }
+
+    // init a shm for bb_inst_info
+    char chm_file_path_arg[64];
+    char rm_chm_file_comman[64];
+    strcpy(chm_file_path_arg, "/tmp/1");
+    strcpy(rm_chm_file_comman, "rm /tmp/1");
+    system(rm_chm_file_comman);
+    if (!get_shm_user_base()) {
+        if (shm_init(NULL, chm_file_path_arg)) {
+            printf("init shm done\n");
+        } else {
+            printf("init share mem error!\n");
+            exit(0);
         }
     }
 
