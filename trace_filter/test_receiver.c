@@ -5,8 +5,8 @@
 #include <unistd.h>
 
 #include "ring_buf.h"
-#include "trace_filter.h"
 #include "shm.h"
+#include "trace_filter.h"
 
 int main(int argc, char** argv) {
     ring_buf_t* ring_buf_by_cpu[1024];
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
             exit(0);
         }
     }
-    
+
     key_t shm_key = ftok("/dev/null", 0);
     if (shm_key == -1) {
         perror("ftok error");
@@ -56,7 +56,9 @@ int main(int argc, char** argv) {
     while (1) {
         for (int i = 0; i < cpu_num; i++) {
             while (ring_buf_out(ring_buf_by_cpu[i], tb_info)) {
-                print_tb_info(tb_info);
+                if (!tb_info->insn_type) {
+                    print_trace(tb_info);
+                }
                 user_inst_count += tb_info->insn_type ? 0 : tb_info->real_insn_num;
                 sys_inst_count += tb_info->insn_type ? tb_info->real_insn_num : 0;
             }
@@ -64,7 +66,9 @@ int main(int argc, char** argv) {
         if (ring_buf_by_cpu[0]->trace_end) {
             for (int i = 0; i < cpu_num; i++) {
                 while (ring_buf_out(ring_buf_by_cpu[i], tb_info)) {
-                printTrace(tb_info);
+                    if (!tb_info->insn_type) {
+                        print_trace(tb_info);
+                    }
                     user_inst_count += tb_info->insn_type ? 0 : tb_info->real_insn_num;
                     sys_inst_count += tb_info->insn_type ? tb_info->real_insn_num : 0;
                 }

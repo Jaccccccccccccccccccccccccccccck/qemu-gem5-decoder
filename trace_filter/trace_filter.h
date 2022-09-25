@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "shm.h"
+
 struct TraceFilter {
     bool is_filter_on;
     bool is_filter_by_pid;
@@ -46,18 +48,19 @@ struct tb_info {
     unsigned long offset;
     int mem_num;
     struct mem_info mi[MAX_MEMINFOS];
-    tb_inst_info_t* tb_inst_info;
+    unsigned long tb_inst_info_shm_offt; // 不同进程间通信，需要用offset重新计算地址
 };
 typedef struct tb_info tb_info_t;
 
 static inline void print_tb_info(tb_info_t* tb_info) {
-    printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d, tt addr: %p\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num, (void*)tb_info->tb_inst_info);
+    printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d, mem num: %d\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num, tb_info->mem_num);
 }
 
-static inline void printTrace(tb_info_t* tb_info) {
-    printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d, tt addr: %p\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num, (void*)tb_info->tb_inst_info);
-    for (int i = 0; i < tb_info->tb_inst_info->insn_num; i++) {
-        printf("%lx %x\n", tb_info->tb_inst_info->ti[i].pc, tb_info->tb_inst_info->ti[i].instr);
+static inline void print_trace(tb_info_t* tb_info) {
+    printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d, mem num: %d\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num, tb_info->mem_num);
+    tb_inst_info_t* tb_inst_info = SHM_OFFT_TO_ADDR(tb_info->tb_inst_info_shm_offt);
+    for (int i = 0; i < tb_inst_info->insn_num; i++) {
+        printf("%lx %x\n", tb_inst_info->ti[i].pc, tb_inst_info->ti[i].instr);
     }
     printf("\n");
 }

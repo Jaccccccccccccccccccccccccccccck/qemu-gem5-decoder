@@ -17,3 +17,5 @@ GTAGS
 *.patch
 .vscode
 /CMakeFiles
+*.dis
+*.out
