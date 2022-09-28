@@ -401,6 +401,9 @@ static inline bool use_goto_tb(DisasContext *s, uint64_t dest)
 
 static inline void gen_goto_tb(DisasContext *s, int n, uint64_t dest)
 {
+    TCGv_ptr dcs = tcg_const_ptr(s->base.tb);
+    gen_helper_bb_end_callback(dcs, cpu_env);
+    tcg_temp_free_ptr(dcs);
     if (use_goto_tb(s, dest)) {
         tcg_gen_goto_tb(n);
         gen_a64_set_pc_im(dest);
@@ -14677,11 +14680,13 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     insn = arm_ldl_code(env, s->base.pc_next, s->sctlr_b);
     s->insn = insn;
 
-    // why cpu->is_trace_on and trace_filter.is_filter_on is always false here?
     struct tb_inst_info* ptt = s->base.tb->tt;
-    ptt->ti[ptt->insn_num].pc = s->pc_curr;
-    ptt->ti[ptt->insn_num].instr = s->insn;
-    ptt->insn_num++;
+    if (ptt) {
+        ptt->ti[ptt->insn_num].pc = s->pc_curr;
+        ptt->ti[ptt->insn_num].instr = s->insn;
+        ptt->insn_num++;
+    }
+    // decode(insn);
 
     s->base.pc_next += 4;
 
@@ -14908,7 +14913,9 @@ static void aarch64_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 static void aarch64_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
-    gen_helper_bb_end_callback(tcg_const_ptr(dcbase->tb), cpu_env);
+    TCGv_ptr dcs = tcg_const_ptr(dcbase->tb);
+    gen_helper_bb_end_callback(dcs, cpu_env);
+    tcg_temp_free_ptr(dcs);
     if (unlikely(dc->base.singlestep_enabled || dc->ss_active)) {
         /* Note that this means single stepping WFI doesn't halt the CPU.
          * For conditional branch insns this is harmless unreachable code as
@@ -15040,7 +15047,7 @@ static int is_trace_on_by_pid(int current_pid, int current_tgid, int current_ppi
 void helper_bb_start_callback(void* s, CPUARMState* env) {
     TranslationBlock* tb = s;
     CPUState* cpu = env_cpu(env);
-    if (cpu->is_trace_on) {
+    if (cpu->is_trace_on && tb->tt) {
         cpu->sendbuf->pid = cpu->current_pid;
         cpu->sendbuf->tgid = cpu->current_tgid;
         cpu->sendbuf->cpu_id = cpu->cpu_index;
@@ -15051,8 +15058,9 @@ void helper_bb_start_callback(void* s, CPUARMState* env) {
 }
 
 void helper_bb_end_callback(void* s, CPUARMState* env) {
+    TranslationBlock* tb = s;
     CPUState* cpu = env_cpu(env);
-    if (cpu->is_trace_on) {
+    if (cpu->is_trace_on && tb->tt) {
         TranslationBlock* tb = s;
         cpu->sendbuf->real_insn_num = tb->tt->insn_num;
         while (true) {

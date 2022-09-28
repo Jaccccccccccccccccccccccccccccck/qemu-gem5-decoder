@@ -1483,8 +1483,11 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
     }
 
     tcg_func_start(tcg_ctx);
-
-    tb->tt = SHM_OFFT_TO_ADDR(shm_malloc(sizeof(struct tb_inst_info)));
+    if (trace_filter.is_filter_on) {
+        tb->tt = SHM_OFFT_TO_ADDR(shm_malloc(sizeof(struct tb_inst_info)));
+    } else {
+        tb->tt = NULL;
+    }
 
     tcg_ctx->cpu = env_cpu(env);
     gen_intermediate_code(cpu, tb, max_insns);
