@@ -38,6 +38,7 @@
 #include "translate-a64.h"
 #include "qemu/atomic128.h"
 
+#include "subprojects/gem5_decoder_arm/decoder_warpper.hh"
 #include "trace_filter/trace_filter.h"
 #include "trace_filter/ring_buf.h"
 #include "trace_filter/shm.h"
@@ -14684,6 +14685,7 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     if (ptt) {
         ptt->ti[ptt->insn_num].pc = s->pc_curr;
         ptt->ti[ptt->insn_num].instr = s->insn;
+        decode_opcode(s->insn, ptt->ti[ptt->insn_num].opcode);
         ptt->insn_num++;
     }
     // decode(insn);

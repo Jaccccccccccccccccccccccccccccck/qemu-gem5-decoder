@@ -28,6 +28,7 @@ struct inst_info {
     unsigned long pc;
     unsigned int instr;
     unsigned long hva;
+    char opcode[24];
 };
 typedef struct inst_info inst_info_t;
 
@@ -60,7 +61,7 @@ static inline void print_trace(tb_info_t* tb_info) {
     printf("cpu: %d, el_type: %d, pid: %d, tgid:%d, inst num:%d, mem num: %d\n", tb_info->cpu_id, tb_info->insn_type, tb_info->pid, tb_info->tgid, tb_info->real_insn_num, tb_info->mem_num);
     tb_inst_info_t* tb_inst_info = SHM_OFFT_TO_ADDR(tb_info->tb_inst_info_shm_offt);
     for (int i = 0; i < tb_inst_info->insn_num; i++) {
-        printf("%lx %x\n", tb_inst_info->ti[i].pc, tb_inst_info->ti[i].instr);
+        printf("%lx %x %s\n", tb_inst_info->ti[i].pc, tb_inst_info->ti[i].instr, tb_inst_info->ti[i].opcode);
     }
     printf("\n");
 }
